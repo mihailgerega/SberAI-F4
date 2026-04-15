@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SberAI Track Limits | Stub</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+        href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap"
+        rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+    <div class="bg-glow bg-glow-left" aria-hidden="true"></div>
+    <div class="bg-glow bg-glow-right" aria-hidden="true"></div>
+
+    <main class="layout">
+        <section class="panel panel-upload">
+            <p class="eyebrow">SberAI-F4 / Prototype</p>
+            <h1>Контроль выезда за пределы трассы</h1>
+            <p class="subtitle">
+                Загрузите изображение или видео. Для видео интерфейс отправляет кадры по одному в backend.
+            </p>
+
+            <div class="controls-grid">
+                <div class="file-picker-group">
+                    <button id="chooseMediaBtn" class="file-picker" type="button">Выбрать медиафайл</button>
+                    <input id="mediaInput" class="visually-hidden-input" type="file" accept="image/*,video/*" />
+                    <span id="selectedFileName" class="selected-file-name">Файл не выбран</span>
+                </div>
+
+                <label class="fps-control" for="sampleFps">
+                    FPS выборки видео
+                    <input id="sampleFps" type="number" min="0.5" max="15" step="0.5" value="2" />
+                </label>
+
+                <button id="processBtn" type="button">Запустить обработку</button>
+            </div>
+
+            <div class="status-line">
+                <span id="statusBadge" class="status status-idle">Ожидание файла</span>
+                <span id="frameCounter">Кадр: -</span>
+            </div>
+        </section>
+
+        <section class="panel panel-preview">
+            <h2>Просмотр кадра и масок</h2>
+            <canvas id="previewCanvas" width="1280" height="720"></canvas>
+        </section>
+
+        <section class="panel panel-response">
+            <h2>YOLO Segmentation ответ</h2>
+            <pre id="responseBox">Нет данных</pre>
+        </section>
+    </main>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>
