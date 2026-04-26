@@ -1,0 +1,2 @@
+WHEEL_MODEL_PATH=models/yolo_wheels.pt
+HF_TOKEN=hf_xxxxxxxxxxxxxxxxxxxxx
