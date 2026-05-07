@@ -12,7 +12,7 @@ from app.schemas import (
     YoloMask,
 )
 from app.services import OfftrackDetector
-from app.services import Sam3TrackBoundaryService
+from app.services import TrackSegmentationService
 from app.services import (
     encode_bgr_to_data_url,
     encode_mask_to_data_url,
@@ -22,7 +22,7 @@ from app.services import WheelSegmentationService
 router = APIRouter()
 
 
-track_service = Sam3TrackBoundaryService()
+track_service = TrackSegmentationService()
 wheel_service = WheelSegmentationService()
 detector = OfftrackDetector()
 
@@ -56,19 +56,17 @@ def _build_analysis_payload(
     frame_index: int,
     track_prompts: list[str] | None = None,
 ):
-    if track_prompts is not None:
-        track_service.prompts = list(track_prompts)
 
-    track_payload = track_service.build_track_mask_payload(frame_bgr, frame_index)
+    track_payloads = track_service.build_track_mask_payload(frame_bgr, frame_index)
     wheel_payloads = wheel_service.build_wheel_mask_payload(frame_bgr, frame_index)
 
     analysis = detector.analyze(
         frame_bgr=frame_bgr,
-        track_points=track_payload["points"], # pyright: ignore[reportArgumentType]
+        track_points=track_payloads, # pyright: ignore[reportArgumentType]
         wheel_masks=wheel_payloads,
     )
 
-    return track_payload, wheel_payloads, analysis
+    return track_payloads, wheel_payloads, analysis
 
 
 @router.post("/infer/frame", response_model=FrameInferenceResponse)
@@ -79,8 +77,8 @@ async def infer_frame(
     frame_bgr = _decode_uploaded_frame(frame)
 
     wheel_payloads = wheel_service.build_wheel_mask_payload(frame_bgr, frame_index)
-    track_payload = track_service.build_track_mask_payload(frame_bgr, frame_index)
-    wheel_payloads.append(track_payload)
+    track_payloads = track_service.build_track_mask_payload(frame_bgr, frame_index)
+    wheel_payloads.extend(track_payloads)
     # print(wheel_payloads[0])
     masks = [YoloMask(**mask) for mask in wheel_payloads]  # pyright: ignore[reportGeneralTypeIssues, reportArgumentType]
 
@@ -122,7 +120,7 @@ async def infer_violation(
         reason=analysis.reason,
         offtrack_wheels=[WheelOfftrackDetail(**d.__dict__) for d in analysis.offtrack_wheels],
         masks=[
-            track_payload,
+            *track_payload,
             *wheel_payloads,
         ],
     )

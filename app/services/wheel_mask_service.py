@@ -8,8 +8,6 @@ load_dotenv()
 
 class WheelSegmentationService:
     """
-    Optional adapter for your trained segmentation .pt model.
-
     If ULTRALYTICS is available and WHEEL_MODEL_PATH is set, this service loads
     the model and returns wheel masks in the same payload format as your current stubs.
     Otherwise it falls back to a deterministic demo polygon so the rest of the app keeps running.
@@ -82,17 +80,16 @@ class WheelSegmentationService:
         payload: list[dict[str, object]] = []
 
         # Раскомментировать, если хочется получать стандартные маски без запуска модели (константные т.е.)
-        # if model is None:
+        # if model is not None:
         #     for idx, poly_norm in enumerate(self._fallback_wheel_polygons(frame_index)):
         #         poly_px = np.stack([poly_norm[:, 0] * width, poly_norm[:, 1] * height], axis=1)
         #         payload.append(
         #             {
-        #                 "model_name": "wheel_segmentation_stub",
+        #                 "model_name": "wheels stock mask",
         #                 "class_id": 1,
         #                 "class_name": self.class_name,
         #                 # "instance_id": idx,
         #                 "points": [[round(float(x), 6), round(float(y), 6)] for x, y in poly_norm.tolist()],
-        #                 "yolo_segmentation": self._to_yolo_segmentation(1, poly_px, width, height),
         #                 # "polygon_px": [[int(x), int(y)] for x, y in poly_px],
         #             }
         #         )
@@ -125,13 +122,12 @@ class WheelSegmentationService:
             poly_arr = np.asarray(poly, dtype=np.float32)
             payload.append(
                 {
-                    "model_name": "wheels",
+                    "model_name": "wheel seg yolo",
                     "class_id": 1,
                     "class_name": self.class_name,
                     # "instance_id": instance_id,
                     # "confidence": float(scores[i]) if i < len(scores) else None,
                     "points": self._norm_points(poly_arr, width, height),
-                    "yolo_segmentation": self._to_yolo_segmentation(1, poly_arr, width, height),
                     # "polygon_px": [[int(x), int(y)] for x, y in poly_arr],
                 }
             )
