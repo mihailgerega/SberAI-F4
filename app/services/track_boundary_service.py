@@ -1,15 +1,34 @@
+from __future__ import annotations
+
 from functools import lru_cache
 from typing import Iterable
 
 import cv2
 import os
 import numpy as np
-import torch
-from PIL import Image
 from app.schemas import TrackSegmentationResult
-from transformers import Sam3Model, Sam3Processor
-from huggingface_hub import login
 from dotenv import load_dotenv
+
+try:
+    from PIL import Image
+except ImportError:  # pragma: no cover - optional CV dependency
+    Image = None
+
+try:
+    import torch
+except ImportError:  # pragma: no cover - optional CV dependency
+    torch = None
+
+try:
+    from transformers import Sam3Model, Sam3Processor
+except ImportError:  # pragma: no cover - optional CV dependency
+    Sam3Model = None
+    Sam3Processor = None
+
+try:
+    from huggingface_hub import login
+except ImportError:  # pragma: no cover - optional CV dependency
+    login = None
 
 load_dotenv()
 
@@ -48,10 +67,13 @@ class Sam3TrackBoundaryService:
         self.min_area_ratio = min_area_ratio
         self.max_area_ratio = max_area_ratio
         self.token = os.getenv("HF_TOKEN") # Подгружаем токен для доступа к HuggingFace
-        self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
+        cuda_available = torch is not None and torch.cuda.is_available()
+        self.device = device or ("cuda" if cuda_available else "cpu")
 
     @staticmethod
     def _ensure_rgb_pil(frame_bgr: np.ndarray) -> Image.Image:
+        if Image is None:
+            raise RuntimeError("Pillow is required for SAM track segmentation")
         if frame_bgr.ndim != 3 or frame_bgr.shape[2] != 3:
             raise ValueError(f"Expected BGR image with shape HxWx3, got {frame_bgr.shape}")
         frame_rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
@@ -131,12 +153,13 @@ class Sam3TrackBoundaryService:
 
     @lru_cache(maxsize=1)
     def _load_model(self):
-        if Sam3Model is None or Sam3Processor is None:
+        if torch is None or Sam3Model is None or Sam3Processor is None:
             raise RuntimeError(
-                "transformers Sam3Model/Sam3Processor are not available. "
+                "torch and transformers Sam3Model/Sam3Processor are not available. "
                 "Install the SAM 3-compatible Transformers build and the gated model access."
             )
-        login(token=self.token)
+        if login is not None and self.token:
+            login(token=self.token)
         model = Sam3Model.from_pretrained(self.model_name).to(self.device) # pyright: ignore[reportArgumentType]
         processor = Sam3Processor.from_pretrained(self.model_name)
         model.eval()

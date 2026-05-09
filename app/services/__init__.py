@@ -6,6 +6,10 @@ from .wheel_mask_service import WheelSegmentationService
 from .track_boundary_service import Sam3TrackBoundaryService
 
 __all__ = [
-    "build_stub_masks", "OfftrackDetector", "encode_bgr_to_data_url", 
-    "encode_mask_to_data_url", "WheelSegmentationService", "Sam3TrackBoundaryService",
+    "build_stub_masks",
+    "OfftrackDetector",
+    "encode_bgr_to_data_url",
+    "encode_mask_to_data_url",
+    "WheelSegmentationService",
+    "Sam3TrackBoundaryService",
 ]

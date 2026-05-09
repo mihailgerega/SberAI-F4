@@ -1,8 +1,14 @@
-from dataclasses import dataclass
-from ultralytics import YOLO
 import numpy as np
 import os
+
 from dotenv import load_dotenv
+
+os.environ.setdefault("YOLO_CONFIG_DIR", "/tmp/Ultralytics")
+
+try:
+    from ultralytics import YOLO
+except ImportError:  # pragma: no cover - optional CV dependency
+    YOLO = None
 
 load_dotenv()
 
@@ -81,22 +87,30 @@ class WheelSegmentationService:
 
         payload: list[dict[str, object]] = []
 
-        # Раскомментировать, если хочется получать стандартные маски без запуска модели (константные т.е.)
-        # if model is None:
-        #     for idx, poly_norm in enumerate(self._fallback_wheel_polygons(frame_index)):
-        #         poly_px = np.stack([poly_norm[:, 0] * width, poly_norm[:, 1] * height], axis=1)
-        #         payload.append(
-        #             {
-        #                 "model_name": "wheel_segmentation_stub",
-        #                 "class_id": 1,
-        #                 "class_name": self.class_name,
-        #                 # "instance_id": idx,
-        #                 "points": [[round(float(x), 6), round(float(y), 6)] for x, y in poly_norm.tolist()],
-        #                 "yolo_segmentation": self._to_yolo_segmentation(1, poly_px, width, height),
-        #                 # "polygon_px": [[int(x), int(y)] for x, y in poly_px],
-        #             }
-        #         )
-        #     return payload
+        if model is None:
+            for poly_norm in self._fallback_wheel_polygons(frame_index):
+                poly_px = np.stack(
+                    [poly_norm[:, 0] * width, poly_norm[:, 1] * height],
+                    axis=1,
+                )
+                payload.append(
+                    {
+                        "model_name": "wheel_segmentation_stub",
+                        "class_id": 1,
+                        "class_name": self.class_name,
+                        "points": [
+                            [round(float(x), 6), round(float(y), 6)]
+                            for x, y in poly_norm.tolist()
+                        ],
+                        "yolo_segmentation": self._to_yolo_segmentation(
+                            1,
+                            poly_px,
+                            width,
+                            height,
+                        ),
+                    }
+                )
+            return payload
 
         # Ultralytics segmentation path.
         results = model.predict(source=frame_bgr, conf=self.conf, iou=self.iou, verbose=False, retina_masks=True) # pyright: ignore[reportOptionalMemberAccess]
