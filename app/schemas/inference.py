@@ -9,9 +9,9 @@ class YoloMask(BaseModel):
     model_name: str = Field(..., description="Model alias that produced the mask")
     class_id: int = Field(..., description="Class id in YOLO segmentation")
     class_name: str = Field(..., description="Human readable class name")
-    yolo_segmentation: list[float] = Field(
-        ..., description='YOLO segmentation line: "cls x1 y1 x2 y2 ..."'
-    )
+    # yolo_segmentation: list[float] = Field( # Крайне не рекомендую передавать этот параметр, раздувает конечное изображение на фронтенде
+    #     ..., description='YOLO segmentation line: "cls x1 y1 x2 y2 ..."'
+    # )
     points: list[list[float]] = Field(
         ..., description="Normalized polygon points as [x, y] pairs"
     )

@@ -1,2 +1,3 @@
 WHEEL_MODEL_PATH=./app/models/yolo26_seg_best.pt
+TRACK_MODEL_PATH=./app/models/best_track.pt
 HF_TOKEN=hf_xxxxxxxxxxxxxxxxxxxxx

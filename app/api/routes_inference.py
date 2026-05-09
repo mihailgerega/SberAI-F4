@@ -1,5 +1,5 @@
 import base64
-from typing import Annotated
+from typing import Annotated, Any
 
 import cv2
 import numpy as np
@@ -11,8 +11,7 @@ from app.schemas import (
     ViolationRegion,
     YoloMask,
 )
-from app.services import OfftrackDetector
-from app.services import Sam3TrackBoundaryService
+from app.services import OfftrackDetector, TrackSegmentationService
 from app.services import (
     encode_bgr_to_data_url,
     encode_mask_to_data_url,
@@ -24,7 +23,7 @@ router = APIRouter()
 MAX_UPLOAD_BYTES = 25 * 1024 * 1024
 MAX_FRAME_PIXELS = 25_000_000
 
-track_service = Sam3TrackBoundaryService()
+track_service = TrackSegmentationService()
 wheel_service = WheelSegmentationService()
 
 
@@ -51,6 +50,7 @@ def _decode_uploaded_frame(frame: UploadFile) -> np.ndarray:
             status_code=400,
             detail="Unable to decode uploaded data as image frame",
         )
+
     frame_pixels = int(frame_bgr.shape[0]) * int(frame_bgr.shape[1])
     if frame_pixels > MAX_FRAME_PIXELS:
         raise HTTPException(
@@ -82,6 +82,26 @@ def _to_yolo_segmentation(
     for x, y in points:
         segmentation.extend([x, y])
     return segmentation
+
+
+def _polygon_area(points: list[list[float]]) -> float:
+    if len(points) < 3:
+        return 0.0
+    area = 0.0
+    for idx, point in enumerate(points):
+        next_point = points[(idx + 1) % len(points)]
+        area += point[0] * next_point[1] - next_point[0] * point[1]
+    return abs(area) * 0.5
+
+
+def _select_track_payload(track_payloads: list[dict[str, Any]]) -> dict[str, Any]:
+    if not track_payloads:
+        raise RuntimeError("Track segmentation did not return any masks")
+
+    return max(
+        track_payloads,
+        key=lambda payload: _polygon_area(payload.get("points", [])),
+    )
 
 
 def _mask_to_violation_regions(
@@ -158,10 +178,9 @@ async def infer_frame(
     frame_bgr = _decode_uploaded_frame(frame)
 
     wheel_payloads = wheel_service.build_wheel_mask_payload(frame_bgr, frame_index)
-    track_payload = track_service.build_track_mask_payload(frame_bgr, frame_index)
-    wheel_payloads.append(track_payload)
+    track_payloads = track_service.build_track_mask_payload(frame_bgr, frame_index)
     masks = [
-        YoloMask(**mask) for mask in wheel_payloads
+        YoloMask(**mask) for mask in [*track_payloads, *wheel_payloads]
     ]  # pyright: ignore[reportGeneralTypeIssues, reportArgumentType]
 
     return FrameInferenceResponse(
@@ -197,7 +216,8 @@ async def infer_violation(
     )
 
     try:
-        track_payload = track_service.build_track_mask_payload(frame_bgr, frame_index)
+        track_payloads = track_service.build_track_mask_payload(frame_bgr, frame_index)
+        track_payload = _select_track_payload(track_payloads)
         wheel_payloads = wheel_service.build_wheel_mask_payload(frame_bgr, frame_index)
         analysis = detector.analyze(
             frame_bgr=frame_bgr,
@@ -231,7 +251,7 @@ async def infer_violation(
         offtrack_wheels=analysis.offtrack_wheels,
         violation_regions=violation_regions,
         masks=[
-            track_payload,
+            *track_payloads,
             *wheel_payloads,
         ],
     )
