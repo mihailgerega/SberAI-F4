@@ -3,8 +3,6 @@ import os
 import numpy as np
 from dotenv import load_dotenv
 
-os.environ.setdefault("YOLO_CONFIG_DIR", "/tmp/Ultralytics")
-
 try:
     from ultralytics import YOLO
 except ImportError:  # pragma: no cover - optional CV dependency

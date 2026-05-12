@@ -170,26 +170,26 @@ def _mask_to_violation_regions(
     return regions
 
 
-@router.post("/infer/frame", response_model=FrameInferenceResponse)
-async def infer_frame(
-    frame: UploadFile = File(...),
-    frame_index: int = Form(0),
-) -> FrameInferenceResponse:
-    frame_bgr = _decode_uploaded_frame(frame)
+# @router.post("/infer/frame", response_model=FrameInferenceResponse)
+# async def infer_frame(
+#     frame: UploadFile = File(...),
+#     frame_index: int = Form(0),
+# ) -> FrameInferenceResponse:
+#     frame_bgr = _decode_uploaded_frame(frame)
 
-    wheel_payloads = wheel_service.build_wheel_mask_payload(frame_bgr, frame_index)
-    track_payloads = track_service.build_track_mask_payload(frame_bgr, frame_index)
-    masks = [
-        YoloMask(**mask) for mask in [*track_payloads, *wheel_payloads]
-    ]  # pyright: ignore[reportGeneralTypeIssues, reportArgumentType]
+#     wheel_payloads = wheel_service.build_wheel_mask_payload(frame_bgr, frame_index)
+#     track_payloads = track_service.build_track_mask_payload(frame_bgr, frame_index)
+#     masks = [
+#         YoloMask(**mask) for mask in [*track_payloads, *wheel_payloads]
+#     ]  # pyright: ignore[reportGeneralTypeIssues, reportArgumentType]
 
-    return FrameInferenceResponse(
-        frame_index=frame_index,
-        frame_width=int(frame_bgr.shape[1]),
-        frame_height=int(frame_bgr.shape[0]),
-        frame_data_url=_encode_frame_to_data_url(frame_bgr),
-        masks=masks,
-    )
+#     return FrameInferenceResponse(
+#         frame_index=frame_index,
+#         frame_width=int(frame_bgr.shape[1]),
+#         frame_height=int(frame_bgr.shape[0]),
+#         frame_data_url=_encode_frame_to_data_url(frame_bgr),
+#         masks=masks,
+#     )
 
 
 @router.post("/infer/violation", response_model=ViolationAnalysisResponse)

@@ -32,7 +32,7 @@ python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip
 pip install -r requirements.txt
-cp env-example .env
+cp .env-example .env
 uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
@@ -42,7 +42,7 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
 ```env
 WHEEL_MODEL_PATH=./app/models/yolo26_seg_best.pt
-HF_TOKEN=hf_xxxxxxxxxxxxxxxxxxxxx
+TRACK_MODEL_PATH=...
 ```
 
 После запуска откройте в браузере:
@@ -82,3 +82,8 @@ Form-data параметры:
 
 - `frame` (файл кадра),
 - `frame_index` (номер кадра, int).
+
+
+## TODO:
+
+

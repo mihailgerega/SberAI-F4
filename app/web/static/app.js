@@ -145,8 +145,11 @@ async function drawFrameAndMasks(result) {
         drawMaskPolygon(mask, previewCanvas.width, previewCanvas.height);
     }
 
-    for (const region of result.violation_regions || []) {
-        drawViolationRegion(region, previewCanvas.width, previewCanvas.height);
+    if (result.violation_score > 0.7){
+        console.log(result.violation_score)
+        for (const region of result.violation_regions || []) {
+            drawViolationRegion(region, previewCanvas.width, previewCanvas.height);
+        }
     }
 }
 
@@ -214,8 +217,8 @@ function drawViolationRegion(region, width, height) {
     const confidence = Number.isFinite(region.confidence)
         ? ` ${(region.confidence * 100).toFixed(0)}%`
         : "";
-    const fontSize = Math.max(14, Math.round(Math.min(width, height) * 0.018));
-    previewCtx.font = `700 ${fontSize}px 'IBM Plex Sans'`;
+    // const fontSize = Math.max(14, Math.round(Math.min(width, height) * 0.018));
+    previewCtx.font = `700 14px 'IBM Plex Sans'`;
     previewCtx.fillStyle = "#ffffff";
     previewCtx.fillText(`Нарушение${confidence}`, labelX, labelY);
     previewCtx.restore();

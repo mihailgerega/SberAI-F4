@@ -127,19 +127,6 @@ class OfftrackDetector:
             if len(poly_px) >= 3:
                 cv2.polylines(annotated, [poly_px.reshape(-1, 1, 2)], isClosed=True, color=(255, 255, 255), thickness=2)
 
-        text = f"VIOLATION: {'YES' if violation_detected else 'NO'} | score={violation_score:.3f}"
-        color = (0, 0, 255) if violation_detected else (0, 180, 0)
-        cv2.putText(
-            annotated,
-            text,
-            (24, 42),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            0.95,
-            color,
-            2,
-            cv2.LINE_AA,
-        )
-
         return OfftrackAnalysisResult(
             violation_detected=violation_detected,
             violation_score=float(violation_score),
