@@ -86,4 +86,4 @@ Form-data параметры:
 
 ## TODO:
 
-
+- violation_score
