@@ -94,9 +94,10 @@ def _polygon_area(points: list[list[float]]) -> float:
     return abs(area) * 0.5
 
 
-def _select_track_payload(track_payloads: list[dict[str, Any]]) -> dict[str, Any]:
+def _select_track_payload(track_payloads: list[dict[str, Any]]) -> dict[str, Any] | None:
     if not track_payloads:
-        raise RuntimeError("Track segmentation did not return any masks")
+        return None
+        # raise RuntimeError("Track segmentation did not return any masks")
 
     return max(
         track_payloads,
@@ -219,11 +220,36 @@ async def infer_violation(
         track_payloads = track_service.build_track_mask_payload(frame_bgr, frame_index)
         track_payload = _select_track_payload(track_payloads)
         wheel_payloads = wheel_service.build_wheel_mask_payload(frame_bgr, frame_index)
-        analysis = detector.analyze(
-            frame_bgr=frame_bgr,
-            track_points=track_payload["points"],  # pyright: ignore[reportArgumentType]
-            wheel_masks=wheel_payloads,
-        )
+
+        if track_payload and wheel_payloads:
+            analysis = detector.analyze(
+                frame_bgr=frame_bgr,
+                track_points=track_payload["points"] if track_payload else None,  # pyright: ignore[reportArgumentType]
+                wheel_masks=wheel_payloads,
+            )
+
+            violation_regions = _mask_to_violation_regions(
+                violation_mask=analysis.violation_mask, # pyright: ignore[reportArgumentType] - Non-achievable
+                violation_score=analysis.violation_score,
+            )
+            return ViolationAnalysisResponse(
+                frame_index=frame_index,
+                frame_width=int(frame_bgr.shape[1]),
+                frame_height=int(frame_bgr.shape[0]),
+                frame_data_url=encode_bgr_to_data_url(frame_bgr),
+                annotated_frame_data_url=encode_bgr_to_data_url(analysis.annotated_frame_bgr), # pyright: ignore[reportArgumentType] - Non-achievable when track_payload and wheel_payload are not None
+                track_mask_data_url=encode_mask_to_data_url(analysis.track_mask), # pyright: ignore[reportArgumentType] - Non-achievable when track_payload and wheel_payload are not None
+                violation_mask_data_url=encode_mask_to_data_url(analysis.violation_mask), # pyright: ignore[reportArgumentType] - Non-achievable when track_payload and wheel_payload are not None
+                violation_detected=analysis.violation_detected,
+                violation_score=analysis.violation_score,
+                reason=analysis.reason,
+                offtrack_wheels=analysis.offtrack_wheels,
+                violation_regions=violation_regions,
+                masks=[
+                    *track_payloads,
+                    *wheel_payloads,
+                ],
+            )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
@@ -231,25 +257,19 @@ async def infer_violation(
             status_code=503,
             detail=f"Model inference failed: {type(exc).__name__}: {exc}",
         ) from exc
-
-    violation_regions = _mask_to_violation_regions(
-        violation_mask=analysis.violation_mask,
-        violation_score=analysis.violation_score,
-    )
-
     return ViolationAnalysisResponse(
         frame_index=frame_index,
         frame_width=int(frame_bgr.shape[1]),
         frame_height=int(frame_bgr.shape[0]),
         frame_data_url=encode_bgr_to_data_url(frame_bgr),
-        annotated_frame_data_url=encode_bgr_to_data_url(analysis.annotated_frame_bgr),
-        track_mask_data_url=encode_mask_to_data_url(analysis.track_mask),
-        violation_mask_data_url=encode_mask_to_data_url(analysis.violation_mask),
-        violation_detected=analysis.violation_detected,
-        violation_score=analysis.violation_score,
-        reason=analysis.reason,
-        offtrack_wheels=analysis.offtrack_wheels,
-        violation_regions=violation_regions,
+        annotated_frame_data_url="",
+        track_mask_data_url="",
+        violation_mask_data_url="",
+        violation_detected=False,
+        violation_score=0.0,
+        reason="",
+        offtrack_wheels=None,
+        violation_regions=None,
         masks=[
             *track_payloads,
             *wheel_payloads,

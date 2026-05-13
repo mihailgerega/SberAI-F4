@@ -63,14 +63,14 @@ class ViolationAnalysisResponse(BaseModel):
     frame_width: int
     frame_height: int
     frame_data_url: str
-    annotated_frame_data_url: str
-    track_mask_data_url: str
-    violation_mask_data_url: str
+    annotated_frame_data_url: str | None
+    track_mask_data_url: str | None
+    violation_mask_data_url: str | None
     violation_detected: bool
     violation_score: float
     reason: str
-    offtrack_wheels: list[WheelOfftrackDetail]
-    violation_regions: list[ViolationRegion]
+    offtrack_wheels: list[WheelOfftrackDetail] | None
+    violation_regions: list[ViolationRegion] | None
     masks: list[dict[str, Any]]
 
 
@@ -79,10 +79,10 @@ class OfftrackAnalysisResult:
     violation_detected: bool
     violation_score: float
     reason: str
-    offtrack_wheels: list[WheelOfftrackDetail]
-    annotated_frame_bgr: np.ndarray
-    track_mask: np.ndarray
-    violation_mask: np.ndarray
+    offtrack_wheels: list[WheelOfftrackDetail] | None
+    annotated_frame_bgr: np.ndarray | None
+    track_mask: np.ndarray | None
+    violation_mask: np.ndarray | None
 
 
 @dataclass(slots=True)

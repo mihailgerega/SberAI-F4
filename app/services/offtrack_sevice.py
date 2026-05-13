@@ -52,9 +52,19 @@ class OfftrackDetector:
     def analyze(
         self,
         frame_bgr: np.ndarray,
-        track_points: list[list[float]],
+        track_points: list[list[float]] | None,
         wheel_masks: list[dict[str, Any]],
     ) -> OfftrackAnalysisResult:
+        if not track_points:
+            return OfftrackAnalysisResult(
+                violation_detected=False,
+                violation_score=0.0,
+                reason="",
+                offtrack_wheels=None,
+                annotated_frame_bgr=None,
+                track_mask=None,
+                violation_mask=None,
+            )
         height, width = frame_bgr.shape[:2]
         track_poly = self._to_abs_polygon(track_points, width, height)
         track_mask = self._polygon_mask((height, width), track_poly)
