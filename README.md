@@ -33,7 +33,7 @@ source .venv/bin/activate
 python -m pip install --upgrade pip
 pip install -r requirements.txt
 cp .env-example .env
-uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+uvicorn app.main:app --host localhost --port 8000 --reload
 ```
 
 Если в системе есть `python`, можно использовать его вместо `python3`.
@@ -87,3 +87,7 @@ Form-data параметры:
 ## TODO:
 
 - violation_score
+- threshhold на бэкенд и в переменные
+- threshhold на каждое нарушение
+- сделать описание датасета на kaggle
+- примеры работы и часть презы пихнуть в ридми
