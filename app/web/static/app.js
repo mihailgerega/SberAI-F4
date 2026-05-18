@@ -73,7 +73,10 @@ async function processImage(imageFile) {
     await drawFrameAndMasks(result);
     frameCounter.textContent = "Кадр: 0";
     responseBox.textContent = formatResponse(result);
-    setStatus("Изображение обработано", "done");
+    const doneStatus = result.violation_detected
+        ? "Изображение обработано, нарушение найдено"
+        : "Изображение обработано";
+    setStatus(doneStatus, "done");
 }
 
 async function processVideo(videoFile) {
@@ -117,7 +120,7 @@ async function sendFrame(frameBlob, frameIndex) {
     formData.append("frame", frameBlob, `frame_${frameIndex}.jpg`);
     formData.append("frame_index", String(frameIndex));
 
-    const response = await fetch("/api/infer/frame", {
+    const response = await fetch("/api/infer/violation", {
         method: "POST",
         body: formData,
     });
@@ -133,15 +136,28 @@ async function sendFrame(frameBlob, frameIndex) {
 async function drawFrameAndMasks(result) {
     const image = await loadImage(result.frame_data_url);
 
-    previewCanvas.width = result.frame_width;
-    previewCanvas.height = result.frame_height;
+    configurePreviewCanvas(result.frame_width, result.frame_height);
 
     previewCtx.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
     previewCtx.drawImage(image, 0, 0, previewCanvas.width, previewCanvas.height);
 
-    for (const mask of result.masks) {
+    for (const mask of result.masks || []) {
         drawMaskPolygon(mask, previewCanvas.width, previewCanvas.height);
     }
+
+    if (result.violation_score > 0.7){
+        console.log(result.violation_score)
+        for (const region of result.violation_regions || []) {
+            drawViolationRegion(region, previewCanvas.width, previewCanvas.height);
+        }
+    }
+}
+
+function configurePreviewCanvas(width, height) {
+    previewCanvas.width = width;
+    previewCanvas.height = height;
+    previewCanvas.style.aspectRatio = `${width} / ${height}`;
+    previewCanvas.setAttribute("aria-label", `Кадр ${width} на ${height}`);
 }
 
 function drawMaskPolygon(mask, width, height) {
@@ -173,6 +189,41 @@ function drawMaskPolygon(mask, width, height) {
     previewCtx.restore();
 }
 
+function drawViolationRegion(region, width, height) {
+    const points = region.points || [];
+    if (points.length < 3) {
+        return;
+    }
+
+    previewCtx.save();
+    previewCtx.lineWidth = Math.max(3, Math.round(Math.min(width, height) * 0.004));
+    previewCtx.strokeStyle = "#e31937";
+    previewCtx.fillStyle = "rgba(227, 25, 55, 0.32)";
+
+    previewCtx.beginPath();
+    previewCtx.moveTo(points[0][0] * width, points[0][1] * height);
+    for (let i = 1; i < points.length; i += 1) {
+        previewCtx.lineTo(points[i][0] * width, points[i][1] * height);
+    }
+    previewCtx.closePath();
+    previewCtx.fill();
+    previewCtx.stroke();
+
+    const labelX = points[0][0] * width + previewCtx.lineWidth * 2;
+    const labelY = Math.max(
+        points[0][1] * height + previewCtx.lineWidth * 8,
+        previewCtx.lineWidth * 8,
+    );
+    const confidence = Number.isFinite(region.confidence)
+        ? ` ${(region.confidence * 100).toFixed(0)}%`
+        : "";
+    // const fontSize = Math.max(14, Math.round(Math.min(width, height) * 0.018));
+    previewCtx.font = `700 14px 'IBM Plex Sans'`;
+    previewCtx.fillStyle = "#ffffff";
+    previewCtx.fillText(`Нарушение${confidence}`, labelX, labelY);
+    previewCtx.restore();
+}
+
 function formatResponse(result) {
     const lines = [
         `frame_index: ${result.frame_index}`,
@@ -180,7 +231,23 @@ function formatResponse(result) {
         "",
     ];
 
-    for (const mask of result.masks) {
+    if (typeof result.violation_detected === "boolean") {
+        lines.push(`violation_detected: ${result.violation_detected}`);
+        lines.push(`violation_score: ${Number(result.violation_score || 0).toFixed(4)}`);
+        lines.push(`reason: ${result.reason || "-"}`);
+        lines.push("");
+    }
+
+    for (const region of result.violation_regions || []) {
+        lines.push(`violation_model: ${region.model_name}`);
+        lines.push(`class: ${region.class_id} (${region.class_name})`);
+        lines.push(`confidence: ${Number(region.confidence || 0).toFixed(4)}`);
+        lines.push(`bbox_xyxy: ${region.bbox_xyxy}`);
+        lines.push(`yolo: ${region.yolo_segmentation}`);
+        lines.push("");
+    }
+
+    for (const mask of result.masks || []) {
         lines.push(`model: ${mask.model_name}`);
         lines.push(`class: ${mask.class_id} (${mask.class_name})`);
         lines.push(`yolo: ${mask.yolo_segmentation}`);

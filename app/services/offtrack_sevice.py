@@ -52,9 +52,19 @@ class OfftrackDetector:
     def analyze(
         self,
         frame_bgr: np.ndarray,
-        track_points: list[list[float]],
+        track_points: list[list[float]] | None,
         wheel_masks: list[dict[str, Any]],
     ) -> OfftrackAnalysisResult:
+        if not track_points:
+            return OfftrackAnalysisResult(
+                violation_detected=False,
+                violation_score=0.0,
+                reason="",
+                offtrack_wheels=None,
+                annotated_frame_bgr=None,
+                track_mask=None,
+                violation_mask=None,
+            )
         height, width = frame_bgr.shape[:2]
         track_poly = self._to_abs_polygon(track_points, width, height)
         track_mask = self._polygon_mask((height, width), track_poly)
@@ -126,19 +136,6 @@ class OfftrackDetector:
             poly_px = self._to_abs_polygon(poly_points, width, height)
             if len(poly_px) >= 3:
                 cv2.polylines(annotated, [poly_px.reshape(-1, 1, 2)], isClosed=True, color=(255, 255, 255), thickness=2)
-
-        text = f"VIOLATION: {'YES' if violation_detected else 'NO'} | score={violation_score:.3f}"
-        color = (0, 0, 255) if violation_detected else (0, 180, 0)
-        cv2.putText(
-            annotated,
-            text,
-            (24, 42),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            0.95,
-            color,
-            2,
-            cv2.LINE_AA,
-        )
 
         return OfftrackAnalysisResult(
             violation_detected=violation_detected,

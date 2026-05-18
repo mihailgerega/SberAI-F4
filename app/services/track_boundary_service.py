@@ -1,16 +1,24 @@
-from dataclasses import dataclass
-from ultralytics import YOLO
-import numpy as np
 import os
+
+import numpy as np
 from dotenv import load_dotenv
+
+os.environ.setdefault("YOLO_CONFIG_DIR", "/tmp/Ultralytics")
+
+try:
+    from ultralytics import YOLO
+except ImportError:  # pragma: no cover - optional CV dependency
+    YOLO = None
 
 load_dotenv()
 
+
 class TrackSegmentationService:
     """
-    If ULTRALYTICS is available and TRACK_MODEL_PATH is set, this service loads
-    the model and returns wheel masks in the same payload format as your current stubs.
-    Otherwise it falls back to a deterministic demo polygon so the rest of the app keeps running.
+    Adapter for a trained YOLO segmentation model that predicts the track mask.
+
+    The service returns normalized polygons in the same payload format as wheel
+    segmentation, so API clients can render masks independently of image size.
     """
 
     def __init__(
@@ -19,85 +27,101 @@ class TrackSegmentationService:
         conf: float = 0.25,
         iou: float = 0.7,
         class_name: str = "track",
+        allow_fallback: bool = False,
     ) -> None:
         self.model_path = model_path or os.getenv("TRACK_MODEL_PATH", "")
         self.conf = conf
         self.iou = iou
         self.class_name = class_name
+        self.allow_fallback = allow_fallback
         self._model = None
 
     def _load_model(self):
-        # print(self.model_path)
-        if not self.model_path:
-            return None
         if YOLO is None:
-            return None
+            raise RuntimeError("ultralytics is not installed; track model cannot be loaded")
+        if not self.model_path:
+            raise RuntimeError("TRACK_MODEL_PATH is not configured")
+        if not os.path.exists(self.model_path):
+            raise RuntimeError(f"TRACK_MODEL_PATH does not exist: {self.model_path}")
         if self._model is None:
             self._model = YOLO(self.model_path)
-        # print(self._model)
         return self._model
 
     @staticmethod
     def _norm_points(points_xy: np.ndarray, width: int, height: int) -> list[list[float]]:
-        return [[round(float(x) / float(width), 6), round(float(y) / float(height), 6)] for x, y in points_xy]
+        return [
+            [round(float(x) / float(width), 6), round(float(y) / float(height), 6)]
+            for x, y in points_xy
+        ]
 
     @staticmethod
-    def _to_yolo_segmentation(class_id: int, points_xy: np.ndarray, width: int, height: int) -> list[float]:
-        seg: list[float] = [float(class_id)]
+    def _to_yolo_segmentation(
+        class_id: int,
+        points_xy: np.ndarray,
+        width: int,
+        height: int,
+    ) -> list[float]:
+        segmentation: list[float] = [float(class_id)]
         for x, y in points_xy:
-            seg.extend([round(float(x) / float(width), 6), round(float(y) / float(height), 6)])
-        return seg
+            segmentation.extend(
+                [round(float(x) / float(width), 6), round(float(y) / float(height), 6)]
+            )
+        return segmentation
 
     @staticmethod
-    def _fallback_wheel_polygons(frame_index: int) -> list[np.ndarray]:
-        # Deterministic demo positions so the UI works even without the wheel model.
-        t = frame_index % 120
-        x0 = 0.35 + 0.0025 * t
-        y0 = 0.62
-        size = 0.045
-        left = np.array([
-            [x0, y0],
-            [x0 + size, y0],
-            [x0 + size, y0 + size],
-            [x0, y0 + size],
-        ], dtype=np.float32)
+    def _fallback_track_polygon() -> np.ndarray:
+        return np.array(
+            [
+                [0.04, 0.16],
+                [0.94, 0.12],
+                [0.98, 0.88],
+                [0.03, 0.92],
+            ],
+            dtype=np.float32,
+        )
 
-        x1 = 0.55 + 0.0020 * t
-        right = np.array([
-            [x1, y0 - 0.01],
-            [x1 + size, y0 - 0.01],
-            [x1 + size, y0 - 0.01 + size],
-            [x1, y0 - 0.01 + size],
-        ], dtype=np.float32)
-        return [left, right]
+    def _fallback_payload(self, width: int, height: int) -> list[dict[str, object]]:
+        poly_norm = self._fallback_track_polygon()
+        poly_px = np.stack(
+            [poly_norm[:, 0] * width, poly_norm[:, 1] * height],
+            axis=1,
+        )
+        return [
+            {
+                "model_name": "track_segmentation_stub",
+                "class_id": 0,
+                "class_name": self.class_name,
+                "points": [
+                    [round(float(x), 6), round(float(y), 6)]
+                    for x, y in poly_norm.tolist()
+                ],
+                "yolo_segmentation": self._to_yolo_segmentation(0, poly_px, width, height),
+            }
+        ]
 
-    def build_track_mask_payload(self, frame_bgr: np.ndarray, frame_index: int) -> list[dict[str, object]]:
+    def build_track_mask_payload(
+        self,
+        frame_bgr: np.ndarray,
+        frame_index: int,
+    ) -> list[dict[str, object]]:
+        del frame_index
+
         height, width = frame_bgr.shape[:2]
-        model = self._load_model()
-        # print(self.model_path)
-        # print(self._model)
+        try:
+            model = self._load_model()
+        except RuntimeError:
+            if self.allow_fallback:
+                return self._fallback_payload(width, height)
+            raise
 
         payload: list[dict[str, object]] = []
-
-        # Раскомментировать, если хочется получать стандартные маски без запуска модели (константные т.е.)
-        # if model is not None:
-        #     for idx, poly_norm in enumerate(self._fallback_wheel_polygons(frame_index)):
-        #         poly_px = np.stack([poly_norm[:, 0] * width, poly_norm[:, 1] * height], axis=1)
-        #         payload.append(
-        #             {
-        #                 "model_name": "track stock mask",
-        #                 "class_id": 1,
-        #                 "class_name": self.class_name,
-        #                 # "instance_id": idx,
-        #                 "points": [[round(float(x), 6), round(float(y), 6)] for x, y in poly_norm.tolist()],
-        #                 "yolo_segmentation": self._to_yolo_segmentation(1, poly_px, width, height),
-        #                 # "polygon_px": [[int(x), int(y)] for x, y in poly_px],
-        #             }
-        #         )
-        #     return payload
-
-        # Ultralytics segmentation path.
-        results = model.predict(source=frame_bgr, conf=self.conf, iou=self.iou, verbose=False, retina_masks=True) # pyright: ignore[reportOptionalMemberAccess]
+        results = model.predict(
+            source=frame_bgr,
+            conf=self.conf,
+            iou=self.iou,
+            verbose=False,
+            retina_masks=True,
+        )
         if not results:
             return payload
 
@@ -105,33 +129,26 @@ class TrackSegmentationService:
         if result.masks is None or result.boxes is None:
             return payload
 
-        cls_names = getattr(result, "names", {}) or {}
-        mask_data = result.masks.data.detach().cpu().numpy()  # pyright: ignore[reportAttributeAccessIssue] # [N, H, W]
-        polygons = result.masks.xy  # list of polygons in absolute pixels
-        class_ids = result.boxes.cls.detach().cpu().numpy().astype(int) # pyright: ignore[reportAttributeAccessIssue]
-        scores = result.boxes.conf.detach().cpu().numpy() # pyright: ignore[reportAttributeAccessIssue]
+        polygons = result.masks.xy
 
-        instance_id = 0
-        for i, poly in enumerate(polygons):
+        for poly in polygons:
             if poly is None or len(poly) < 3:
-                continue
-            cls_id = int(class_ids[i]) if i < len(class_ids) else 1
-            cls_name = str(cls_names.get(cls_id, self.class_name))
-            if cls_name != self.class_name and cls_id != 1:
                 continue
 
             poly_arr = np.asarray(poly, dtype=np.float32)
             payload.append(
                 {
-                    "model_name": "track seg yolo",
-                    "class_id": 1,
+                    "model_name": "track_seg_yolo",
+                    "class_id": 0,
                     "class_name": self.class_name,
-                    # "instance_id": instance_id,
-                    # "confidence": float(scores[i]) if i < len(scores) else None,
                     "points": self._norm_points(poly_arr, width, height),
-                    # "polygon_px": [[int(x), int(y)] for x, y in poly_arr],
+                    "yolo_segmentation": self._to_yolo_segmentation(
+                        0,
+                        poly_arr,
+                        width,
+                        height,
+                    ),
                 }
             )
-            instance_id += 1
 
         return payload

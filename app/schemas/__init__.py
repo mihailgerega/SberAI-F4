@@ -1,11 +1,23 @@
 from .inference import (
-    FrameInferenceResponse, YoloMask, WheelOfftrackDetail, ViolationAnalysisResponse, 
-    ViolationAnalysisRequest, OfftrackAnalysisResult, TrackSegmentationResult,
-    WheelMaskResult
+    FrameInferenceResponse,
+    OfftrackAnalysisResult,
+    TrackSegmentationResult,
+    ViolationAnalysisRequest,
+    ViolationAnalysisResponse,
+    ViolationRegion,
+    WheelMaskResult,
+    WheelOfftrackDetail,
+    YoloMask,
 )
 
 __all__ = [
-    "FrameInferenceResponse", "YoloMask", "WheelOfftrackDetail", "ViolationAnalysisResponse", 
-    "ViolationAnalysisRequest", "OfftrackAnalysisResult", "TrackSegmentationResult",
-    "WheelMaskResult"
+    "FrameInferenceResponse",
+    "OfftrackAnalysisResult",
+    "TrackSegmentationResult",
+    "ViolationAnalysisRequest",
+    "ViolationAnalysisResponse",
+    "ViolationRegion",
+    "WheelMaskResult",
+    "WheelOfftrackDetail",
+    "YoloMask",
 ]
