@@ -6,6 +6,7 @@ __pycache__/
 # C extensions
 *.so
 Ultralytics/
+data/
 
 # Distribution / packaging
 .Python

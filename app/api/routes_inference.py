@@ -71,7 +71,7 @@ class YoloSegDatasetWriter:
         return img_path, label_path
 
 
-dataset_writer = YoloSegDatasetWriter("/data/f1_dataset", split="train")
+dataset_writer = YoloSegDatasetWriter("./data/f1_dataset", split="train")
 
 
 def _decode_uploaded_frame(frame: UploadFile) -> np.ndarray:
